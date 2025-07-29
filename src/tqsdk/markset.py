@@ -1,9 +1,12 @@
 from datetime import date
+from dataclasses import dataclass
+from typing import Optional, Dict, Any
 from tqsdk import TqApi, TqAuth, TqBacktest, TargetPosTask, TqKq, TqSim
 from tqsdk.ta import MA, ATR, WR, DMI
 import talib
 import numpy as np
 import logging
+import pandas as pd
 
 # 配置日志记录
 logging.basicConfig(
@@ -11,6 +14,18 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s - %(message)s",
 )
+
+
+@dataclass
+class TradingSignals:
+    """交易信号结构体"""
+
+    stop_loss: float
+    take_profit: float
+    long_open: bool
+    short_open: bool
+    long_exit: bool
+    short_exit: bool
 
 
 auth = TqAuth("673973541", "Xin940302.")
@@ -35,28 +50,28 @@ SYMBOLS = [
 
 
 class Strategy:
-    def __init__(self, api: TqApi, symbol_base: str, timeperiod: int):
-        self.api = api
-        self.symbol = None
-        self.symbol_base = symbol_base
-        self.timeperiod = timeperiod
-        self.target_pos = None
-        self.klines = None
+    def __init__(self, api: TqApi, symbol_base: str, timeperiod: int) -> None:
+        self.api: TqApi = api
+        self.symbol: Optional[str] = None
+        self.symbol_base: str = symbol_base
+        self.timeperiod: int = timeperiod
+        self.target_pos: Optional[TargetPosTask] = None
+        self.klines: Optional[pd.DataFrame] = None
 
         self.update_main_contract()
 
-        self.is_buy = False
-        self.is_sell = False
+        self.is_buy: bool = False
+        self.is_sell: bool = False
 
-        self.entry_price = 0
-        self.stop_loss_price = 0
-        self.take_profit_price = 0
+        self.entry_price: float = 0.0
+        self.stop_loss_price: float = 0.0
+        self.take_profit_price: float = 0.0
 
-        self.total_count = 0
-        self.stop_loss_count = 0
-        self.take_profit_count = 0
+        self.total_count: int = 0
+        self.stop_loss_count: int = 0
+        self.take_profit_count: int = 0
 
-    def update_main_contract(self):
+    def update_main_contract(self) -> None:
         """更新主力合约"""
         exchange = self.symbol_base.split(".")[0]
         product = self.symbol_base.split(".")[1]
@@ -75,7 +90,7 @@ class Strategy:
         self.klines = self.api.get_kline_serial(main_symbol, self.timeperiod)
         self.target_pos = TargetPosTask(self.api, main_symbol)
 
-    def get_signals(self):
+    def get_signals(self) -> TradingSignals:
         # 计算指标
         ma20 = MA(self.klines, 21)["ma"].tolist()
         ma144 = MA(self.klines, 144)["ma"].tolist()
@@ -109,16 +124,16 @@ class Strategy:
         logging.debug(
             f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
         )
-        return {
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "long_open": long_open,
-            "short_open": short_open,
-            "long_exit": long_exit,
-            "short_exit": short_exit,
-        }
+        return TradingSignals(
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            long_open=long_open,
+            short_open=short_open,
+            long_exit=long_exit,
+            short_exit=short_exit,
+        )
 
-    def on_bar(self):
+    def on_bar(self) -> None:
         if not self.api.is_changing(self.klines):
             return
 
@@ -128,7 +143,7 @@ class Strategy:
         # 空仓时判断开仓
         if not self.is_buy and not self.is_sell:
             # 开多信号
-            if signals["long_open"]:
+            if signals.long_open:
                 self.target_pos.set_target_volume(
                     fixed_pos
                     if fixed_pos
@@ -136,15 +151,15 @@ class Strategy:
                 )
                 self.is_buy = True
                 self.entry_price = current_price
-                self.stop_loss_price = self.entry_price - signals["stop_loss"]
-                self.take_profit_price = self.entry_price + signals["take_profit"]
+                self.stop_loss_price = self.entry_price - signals.stop_loss
+                self.take_profit_price = self.entry_price + signals.take_profit
                 self.total_count += 1
                 logging.info(
                     f"{self.symbol} 开多：价格={self.entry_price:.2f}, 止损={self.stop_loss_price:.2f}, 止盈={self.take_profit_price:.2f}"
                 )
 
             # 开空信号
-            elif signals["short_open"]:
+            elif signals.short_open:
                 self.target_pos.set_target_volume(
                     -1
                     * (
@@ -155,8 +170,8 @@ class Strategy:
                 )
                 self.is_sell = True
                 self.entry_price = current_price
-                self.stop_loss_price = self.entry_price + signals["stop_loss"]
-                self.take_profit_price = self.entry_price - signals["take_profit"]
+                self.stop_loss_price = self.entry_price + signals.stop_loss
+                self.take_profit_price = self.entry_price - signals.take_profit
                 self.total_count += 1
                 logging.info(
                     f"{self.symbol} 开空：价格={self.entry_price:.2f}, 止损={self.stop_loss_price:.2f}, 止盈={self.take_profit_price:.2f}"
@@ -179,7 +194,7 @@ class Strategy:
                 logging.info(f"{self.symbol} 多单止盈：价格={current_price:.2f}")
                 self.update_main_contract()
             # 信号平仓
-            elif signals["long_exit"]:
+            elif signals.long_exit:
                 self.target_pos.set_target_volume(0)
                 self.is_buy = False
                 logging.info(f"{self.symbol} 多单信号平仓：价格={current_price:.2f}")
@@ -202,13 +217,13 @@ class Strategy:
                 logging.info(f"{self.symbol} 空单止盈：价格={current_price:.2f}")
                 self.update_main_contract()
             # 信号平仓
-            elif signals["short_exit"]:
+            elif signals.short_exit:
                 self.target_pos.set_target_volume(0)
                 self.is_sell = False
                 logging.info(f"{self.symbol} 空单信号平仓：价格={current_price:.2f}")
                 self.update_main_contract()
 
-    def get_stats(self):
+    def get_stats(self) -> Dict[str, Any]:
         return {
             "symbol": self.symbol,
             "total_count": self.total_count,
@@ -218,7 +233,7 @@ class Strategy:
 
 
 # 计算开仓手数
-def position_size(api, klines, symbol):
+def position_size(api: TqApi, klines: pd.DataFrame, symbol: str) -> int:
     atr = ATR(klines, 21)["atr"].tolist()[-1]
     # 设置ATR的最小值，防止除以0或极小值
     MIN_ATR = 0.001
@@ -293,7 +308,7 @@ def position_size(api, klines, symbol):
     return max(config["min_volume"], round(position))  # 至少开1手
 
 
-def test():
+def test() -> None:
     try:
         api = TqApi(
             TqSim(init_balance),
@@ -329,7 +344,7 @@ def test():
                 )
 
 
-def trader():
+def trader() -> None:
     api = TqApi(
         TqKq(),
         auth=auth,
@@ -337,7 +352,7 @@ def trader():
     logging.info(f"账户余额: {api.get_account().balance}")
 
     # 创建多个品种的策略实例
-    strategies = []
+    strategies: list[Strategy] = []
     for symbol in SYMBOLS:
         strategies.append(Strategy(api, symbol, timeperiod))
 
@@ -348,7 +363,7 @@ def trader():
             strategy.on_bar()
 
 
-def main():
+def main() -> None:
     test()
     # trader()
 
