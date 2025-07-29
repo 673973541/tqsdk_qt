@@ -7,6 +7,7 @@ import talib
 import numpy as np
 import logging
 import pandas as pd
+import time
 
 # 配置日志记录
 logging.basicConfig(
@@ -309,6 +310,7 @@ def position_size(api: TqApi, klines: pd.DataFrame, symbol: str) -> int:
 
 
 def test() -> None:
+    start_time = time.time()
     try:
         api = TqApi(
             TqSim(init_balance),
@@ -318,7 +320,7 @@ def test() -> None:
         )
 
         # 创建多个品种的策略实例
-        strategies = []
+        strategies: list[Strategy] = []
         for symbol in SYMBOLS:
             strategies.append(Strategy(api, symbol, timeperiod))
 
@@ -342,6 +344,7 @@ def test() -> None:
                     f"{stats['symbol']} 统计: 总交易次数: {stats['total_count']}, "
                     f"止损次数: {stats['stop_loss_count']}, 止盈次数: {stats['take_profit_count']}"
                 )
+        logging.info(f"总耗时: {time.time() - start_time:.2f} 秒")
 
 
 def trader() -> None:
