@@ -1,13 +1,21 @@
 from datetime import date
-from tqsdk import TqApi, TqAuth, TqBacktest, TargetPosTask, TqSim
+from tqsdk import TqApi, TqAuth, TqBacktest, TargetPosTask, TqKq, TqSim
 from tqsdk.ta import MA, ATR, WR, DMI
 import talib
 import numpy as np
+import logging
+
+# 配置日志记录
+logging.basicConfig(
+    # filename="strategy.log",
+    level=logging.INFO,
+    format="%(levelname)s - %(message)s",
+)
 
 
 auth = TqAuth("673973541", "Xin940302.")
 init_balance = 100000
-fixed_pos = 1
+fixed_pos = 10
 risk_ratio = 0.05
 
 timeperiod = 60 * 60
@@ -19,9 +27,10 @@ end_dt = date(2025, 10, 24)
 # SYMBOLS = ["DCE.c"]
 SYMBOLS = [
     "CZCE.SA",  # yes
-    "CZCE.FG",  # yes
-    #     # "CZCE.MA", # no
-    #     "DCE.v",
+    # "CZCE.FG",  # yes
+    # "CZCE.MA", # no
+    # "DCE.v",
+    # "DCE.l",
 ]
 
 
@@ -59,7 +68,7 @@ class Strategy:
         if main_symbol == self.symbol:
             return
 
-        print(f"{self.symbol_base} 更新主力合约: {main_symbol}")
+        logging.info(f"{self.symbol_base} 更新主力合约: {main_symbol}")
 
         # 更新行情订阅
         self.symbol = main_symbol
@@ -94,7 +103,12 @@ class Strategy:
         short_open = wr_sell and adx_signal and ma_sell
         long_exit = wr_sell
         short_exit = wr_buy
-
+        logging.debug(
+            f"adx: {adx[-1]}, ma20: {ma20[-1]}, ma144: {ma144[-1]}, wr: {wr[-1]}"
+        )
+        logging.debug(
+            f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
+        )
         return {
             "stop_loss": stop_loss,
             "take_profit": take_profit,
@@ -125,7 +139,7 @@ class Strategy:
                 self.stop_loss_price = self.entry_price - signals["stop_loss"]
                 self.take_profit_price = self.entry_price + signals["take_profit"]
                 self.total_count += 1
-                print(
+                logging.info(
                     f"{self.symbol} 开多：价格={self.entry_price:.2f}, 止损={self.stop_loss_price:.2f}, 止盈={self.take_profit_price:.2f}"
                 )
 
@@ -144,7 +158,7 @@ class Strategy:
                 self.stop_loss_price = self.entry_price + signals["stop_loss"]
                 self.take_profit_price = self.entry_price - signals["take_profit"]
                 self.total_count += 1
-                print(
+                logging.info(
                     f"{self.symbol} 开空：价格={self.entry_price:.2f}, 止损={self.stop_loss_price:.2f}, 止盈={self.take_profit_price:.2f}"
                 )
 
@@ -155,20 +169,20 @@ class Strategy:
                 self.target_pos.set_target_volume(0)
                 self.is_buy = False
                 self.stop_loss_count += 1
-                print(f"{self.symbol} 多单止损：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 多单止损：价格={current_price:.2f}")
                 self.update_main_contract()
             # 止盈
             elif current_price >= self.take_profit_price:
                 self.target_pos.set_target_volume(0)
                 self.is_buy = False
                 self.take_profit_count += 1
-                print(f"{self.symbol} 多单止盈：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 多单止盈：价格={current_price:.2f}")
                 self.update_main_contract()
             # 信号平仓
             elif signals["long_exit"]:
                 self.target_pos.set_target_volume(0)
                 self.is_buy = False
-                print(f"{self.symbol} 多单信号平仓：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 多单信号平仓：价格={current_price:.2f}")
                 self.update_main_contract()
 
         # 持空仓时
@@ -178,20 +192,20 @@ class Strategy:
                 self.target_pos.set_target_volume(0)
                 self.is_sell = False
                 self.stop_loss_count += 1
-                print(f"{self.symbol} 空单止损：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 空单止损：价格={current_price:.2f}")
                 self.update_main_contract()
             # 止盈
             elif current_price <= self.take_profit_price:
                 self.target_pos.set_target_volume(0)
                 self.is_sell = False
                 self.take_profit_count += 1
-                print(f"{self.symbol} 空单止盈：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 空单止盈：价格={current_price:.2f}")
                 self.update_main_contract()
             # 信号平仓
             elif signals["short_exit"]:
                 self.target_pos.set_target_volume(0)
                 self.is_sell = False
-                print(f"{self.symbol} 空单信号平仓：价格={current_price:.2f}")
+                logging.info(f"{self.symbol} 空单信号平仓：价格={current_price:.2f}")
                 self.update_main_contract()
 
     def get_stats(self):
@@ -273,9 +287,8 @@ def position_size(api, klines, symbol):
         risk_amount / loss_per_lot,  # 基于风险计算的仓位
         (balance * 0.8) / margin_per_lot,  # 基于保证金计算的仓位（留20%余量）
     )
-    print(
-        risk_amount / loss_per_lot,
-        risk_amount / loss_per_lot < (balance * 0.8) / margin_per_lot,
+    logging.info(
+        f"基于风险计算的仓位: {risk_amount / loss_per_lot}, 是否小于基于保证金计算的仓位: {risk_amount / loss_per_lot < (balance * 0.8) / margin_per_lot}"
     )
     return max(config["min_volume"], round(position))  # 至少开1手
 
@@ -302,22 +315,42 @@ def test():
                 strategy.on_bar()
 
     except Exception as e:
-        print("error:", e)
+        logging.error(f"发生错误: {e}", exc_info=True)
     finally:
-        api.close()
+        if "api" in locals() and api is not None:
+            api.close()
         # 打印每个品种的统计信息
+        if "strategies" in locals():
+            for strategy in strategies:
+                stats = strategy.get_stats()
+                logging.info(
+                    f"{stats['symbol']} 统计: 总交易次数: {stats['total_count']}, "
+                    f"止损次数: {stats['stop_loss_count']}, 止盈次数: {stats['take_profit_count']}"
+                )
+
+
+def trader():
+    api = TqApi(
+        TqKq(),
+        auth=auth,
+    )
+    logging.info(f"账户余额: {api.get_account().balance}")
+
+    # 创建多个品种的策略实例
+    strategies = []
+    for symbol in SYMBOLS:
+        strategies.append(Strategy(api, symbol, timeperiod))
+
+    while True:
+        api.wait_update()
+        # 遍历每个品种执行策略
         for strategy in strategies:
-            stats = strategy.get_stats()
-            print(
-                f"\n{stats['symbol']} 统计:",
-                f"总交易次数: {stats['total_count']},",
-                f"止损次数: {stats['stop_loss_count']},",
-                f"止盈次数: {stats['take_profit_count']}",
-            )
+            strategy.on_bar()
 
 
 def main():
     test()
+    # trader()
 
 
 if __name__ == "__main__":
