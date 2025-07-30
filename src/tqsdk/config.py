@@ -10,7 +10,7 @@ from datetime import date
 
 # ==================== 时间配置 ====================
 # K线周期设置 (秒)
-timeperiod = 15 * 60
+timeperiod = 5 * 60
 
 # 回测时间范围
 start_dt = date(2025, 1, 1)    # 回测开始日期
@@ -30,8 +30,8 @@ ma_long_period = 55      # 长期均线周期
 
 # RSI指标配置
 rsi_period = 14         # RSI计算周期
-rsi_oversold = 30       # RSI超卖阈值
-rsi_overbought = 70     # RSI超买阈值
+rsi_oversold = -70      # RSI超卖阈值
+rsi_overbought = -30    # RSI超买阈值
 
 # ATR指标配置
 atr_period = 14         # ATR计算周期

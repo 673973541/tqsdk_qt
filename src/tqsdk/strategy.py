@@ -7,7 +7,7 @@ import pandas as pd
 from config import (
     fixed_pos, risk_ratio, ma_short_period, ma_long_period,
     atr_period, adx_period, stop_loss_atr_multiplier,
-    take_profit_ratio
+    take_profit_ratio, rsi_oversold, rsi_overbought
 )
 
 
@@ -81,8 +81,8 @@ class Strategy:
         close = self.klines.close.values
         
         # 使用配置文件中的参数计算指标
-        ma_short = talib.SMA(close, timeperiod=ma_short_period)[-1]
-        ma_long = talib.SMA(close, timeperiod=ma_long_period)[-1]
+        ma_short = talib.MA(close, timeperiod=ma_short_period)[-1]
+        ma_long = talib.MA(close, timeperiod=ma_long_period)[-1]
         atr = talib.ATR(high, low, close, timeperiod=atr_period)[-1]
         wr = talib.WILLR(high, low, close, timeperiod=ma_short_period)[-1]
         adx = talib.ADX(high, low, close, timeperiod=adx_period)[-1]
@@ -91,8 +91,8 @@ class Strategy:
         adx_signal = adx > 25
         ma_buy = ma_short > ma_long
         ma_sell = ma_short < ma_long
-        wr_sell = wr < -70
-        wr_buy = wr > -30
+        wr_sell = wr < rsi_oversold
+        wr_buy = wr > rsi_overbought
 
         # 使用配置文件中的参数计算止损止盈
         stop_loss = atr * stop_loss_atr_multiplier
