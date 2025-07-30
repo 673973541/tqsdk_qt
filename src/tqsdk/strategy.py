@@ -217,6 +217,8 @@ class Strategy:
         }
     # 计算开仓手数
     def position_size(self) -> int:
+        # 提取合约基础代码
+        parts = self.symbol.split(".")
         # 期权合约
         if "-C-" in parts[1] or "-P-" in parts[1]:
             return 1  # 期权合约通常最小开仓1手
@@ -263,8 +265,6 @@ class Strategy:
             },
         }
 
-        # 提取合约基础代码
-        parts = self.symbol.split(".")
         import re
 
         symbol_letters = re.match(r"([A-Za-z]+)", parts[1]).group()
