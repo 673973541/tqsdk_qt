@@ -1,14 +1,14 @@
 from tqsdk import TqApi,TargetPosTask
-from tqsdk.ta import MA, ATR
 import talib
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
-import numpy as np
 import logging
 import pandas as pd
-
-fixed_pos = 10
-risk_ratio = 0.05
+from config import (
+    fixed_pos, risk_ratio, ma_short_period, ma_long_period,
+    atr_period, adx_period, stop_loss_atr_multiplier,
+    take_profit_ratio
+)
 
 
 @dataclass
@@ -46,6 +46,17 @@ class Strategy:
 
     def update_main_contract(self) -> None:
         """更新主力合约"""
+        # 判断是否为期权合约（包含-C-或-P-）
+        if "-C-" in self.symbol_base or "-P-" in self.symbol_base:
+            # 期权合约直接使用指定的合约，不查询主力合约
+            if self.symbol is None:
+                self.symbol = self.symbol_base
+                self.klines = self.api.get_kline_serial(self.symbol, self.timeperiod)
+                self.target_pos = TargetPosTask(self.api, self.symbol)
+                logging.info(f"使用期权合约: {self.symbol}")
+            return
+        
+        # 期货合约查询主力合约
         exchange = self.symbol_base.split(".")[0]
         product = self.symbol_base.split(".")[1]
         main_symbols = self.api.query_cont_quotes(
@@ -64,39 +75,40 @@ class Strategy:
         self.target_pos = TargetPosTask(self.api, main_symbol)
 
     def get_signals(self) -> TradingSignals:
-        # 计算指标
-        ma20 = MA(self.klines, 21)["ma"].tolist()
-        ma144 = MA(self.klines, 144)["ma"].tolist()
-        atr = ATR(self.klines, 14)["atr"].tolist()
+        # 数据转换
+        high = self.klines.high.values
+        low = self.klines.low.values
+        close = self.klines.close.values
+        
+        # 使用配置文件中的参数计算指标
+        ma_short = talib.SMA(close, timeperiod=ma_short_period)[-1]
+        ma_long = talib.SMA(close, timeperiod=ma_long_period)[-1]
+        atr = talib.ATR(high, low, close, timeperiod=atr_period)[-1]
+        wr = talib.WILLR(high, low, close, timeperiod=ma_short_period)[-1]
+        adx = talib.ADX(high, low, close, timeperiod=adx_period)[-1]
+        
+        # 信号判断
+        adx_signal = adx > 25
+        ma_buy = ma_short > ma_long
+        ma_sell = ma_short < ma_long
+        wr_sell = wr < -70
+        wr_buy = wr > -30
 
-        high = np.array(self.klines.high)
-        low = np.array(self.klines.low)
-        close = np.array(self.klines.close)
-        wr = talib.WILLR(high, low, close, timeperiod=21)
-        adx = talib.ADX(high, low, close, timeperiod=14)
+        # 使用配置文件中的参数计算止损止盈
+        stop_loss = atr * stop_loss_atr_multiplier
+        take_profit = atr * stop_loss_atr_multiplier * take_profit_ratio
 
-        adx_signal = adx[-1] > 25
-        # 趋势信号
-        ma_buy = ma20[-1] > ma144[-1]
-        ma_sell = ma20[-1] < ma144[-1]
-        wr_sell = wr[-1] < -70
-        wr_buy = wr[-1] > -30
-
-        # 计算止损止盈
-        stop_loss = atr[-1] * 4  # n倍ATR止损
-        take_profit = atr[-1] * 8  # n倍ATR止盈
-
-        # 使用WR超买超卖 + MA趋势 作为开平仓信号
+        # 信号逻辑
         long_open = wr_buy and adx_signal and ma_buy
         short_open = wr_sell and adx_signal and ma_sell
         long_exit = wr_sell
         short_exit = wr_buy
-        logging.debug(
-            f"adx: {adx[-1]}, ma20: {ma20[-1]}, ma144: {ma144[-1]}, wr: {wr[-1]}"
-        )
-        logging.debug(
-            f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
-        )
+        # logging.debug(
+        #     f"adx: {adx}, ma20: {ma20}, ma144: {ma144}, wr: {wr}"
+        # )
+        # logging.debug(
+        #     f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
+        # )
         return TradingSignals(
             stop_loss=stop_loss,
             take_profit=take_profit,
@@ -205,7 +217,16 @@ class Strategy:
         }
     # 计算开仓手数
     def position_size(self) -> int:
-        atr = ATR(self.klines, 21)["atr"].tolist()[-1]
+        # 期权合约
+        if "-C-" in parts[1] or "-P-" in parts[1]:
+            return 1  # 期权合约通常最小开仓1手
+        
+
+        # 使用TA-Lib计算ATR，性能更好
+        close = self.klines.close.values
+        high = self.klines.high.values
+        low = self.klines.low.values
+        atr = talib.ATR(high, low, close, timeperiod=atr_period)[-1]
         # 设置ATR的最小值，防止除以0或极小值
         MIN_ATR = 0.001
         atr = max(atr, MIN_ATR)

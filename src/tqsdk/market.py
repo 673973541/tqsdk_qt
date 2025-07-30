@@ -5,11 +5,15 @@ import logging
 import time
 import signal
 from strategy import Strategy
+from config import (
+    timeperiod, start_dt, end_dt, sim_init_balance,
+    symbols_list, log_level,tq_user, tq_password
+)
 
 # 配置日志记录
 logging.basicConfig(
     # filename="strategy.log",
-    level=logging.INFO,
+    level=getattr(logging, log_level),
     format="%(levelname)s - %(message)s",
 )
 
@@ -22,31 +26,19 @@ def signal_handler(signum, frame):
     logging.info("接收到退出信号，正在优雅关闭...")
     graceful_exit = True
 
-auth = TqAuth("673973541", "Xin940302.")
-init_balance = 100000
+# 初始化TqAuth
+auth = TqAuth(tq_user, tq_password)
 
-timeperiod = 60 * 60
-start_dt = date(2025, 1, 1)
-end_dt = date(2025, 10, 24)
-
-# SYMBOLS = ["DCE.m", "SHFE.rb"]
-# SYMBOLS = ["SHFE.rb"]
-# SYMBOLS = ["DCE.c"]
-SYMBOLS = [
-    "CZCE.SA",  # yes
-    # "CZCE.FG",  # yes
-    # "CZCE.MA", # no
-    # "DCE.v",
-    # "DCE.l",
-]
+# 使用配置文件中的品种列表
+SYMBOLS = symbols_list
 
 
 def test() -> None:
     start_time = time.time()
     try:
         api = TqApi(
-            TqSim(init_balance),
-            web_gui="127.0.0.1:8080",
+            TqSim(sim_init_balance),
+            # web_gui="127.0.0.1:8080",
             backtest=TqBacktest(start_dt, end_dt),
             auth=auth,
         )
@@ -67,7 +59,7 @@ def test() -> None:
             # 打印账户最终状态
             account = api.get_account()
             logging.info(
-                f"回测结束 - 最终余额: {account.balance:.2f}, 收益: {account.balance - init_balance:.2f}"
+                f"回测结束 - 最终余额: {account.balance:.2f}, 收益: {account.balance - sim_init_balance:.2f}"
             )
             api.close()
         # 打印每个品种的统计信息
@@ -81,6 +73,7 @@ def test() -> None:
         logging.info(f"总耗时: {time.time() - start_time:.2f} 秒")
     except Exception as e:
         logging.error(f"发生错误: {e}", exc_info=True)
+        api.close()
 
 def trader() -> None:
     global graceful_exit
