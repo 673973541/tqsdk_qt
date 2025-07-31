@@ -95,7 +95,7 @@ def trader() -> None:
             strategies.append(Strategy(api, symbol, timeperiod))
 
         while not graceful_exit:
-            api.wait_update()
+            api.wait_update(deadline=time.time() + 300)
             # 遍历每个品种执行策略
             for strategy in strategies:
                 strategy.on_bar()

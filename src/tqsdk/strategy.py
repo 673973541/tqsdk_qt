@@ -7,7 +7,7 @@ import pandas as pd
 from config import (
     fixed_pos, risk_ratio, ma_short_period, ma_long_period,
     atr_period, adx_period, stop_loss_atr_multiplier,
-    take_profit_ratio, rsi_oversold, rsi_overbought
+    take_profit_ratio, rsi_oversold, rsi_overbought, adx_threshold
 )
 
 
@@ -88,7 +88,7 @@ class Strategy:
         adx = talib.ADX(high, low, close, timeperiod=adx_period)[-1]
         
         # 信号判断
-        adx_signal = adx > 25
+        adx_signal = adx > adx_threshold
         ma_buy = ma_short > ma_long
         ma_sell = ma_short < ma_long
         wr_sell = wr < rsi_oversold
