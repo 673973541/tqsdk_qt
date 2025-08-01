@@ -13,12 +13,12 @@ from datetime import date
 timeperiod = 30 * 60
 
 # 回测时间范围
-start_dt = date(2024, 4, 1)    # 回测开始日期
-end_dt = date(2025, 10, 24)    # 回测结束日期
+start_dt = date(2022, 4, 1)    # 回测开始日期
+end_dt = date(2024, 10, 24)    # 回测结束日期
 
 # ==================== 交易配置 ====================
 # 固定仓位数量 (手)
-fixed_pos = 10  # 固定持仓n手, 0表示不使用固定仓位
+fixed_pos = 5  # 固定持仓n手, 0表示不使用固定仓位
 
 # 风险比例 (账户资金的百分比)
 risk_ratio = 0.05  # 单笔交易风险不超过账户资金的5%
@@ -63,9 +63,15 @@ symbols_list = [
 ]
 
 # ==================== 系统配置 ====================
-# 日志级别
-log_level = "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR
+# 日志配置
+log_level = "INFO"              # 日志级别: DEBUG, INFO, WARNING, ERROR
+log_to_file = True              # 是否将日志输出到文件
+log_filename = "strategy.log"   # 日志文件名（当log_to_file=True时使用）
+
+# 每日重启时间配置
+restart_hour = 8                # 重启小时 (24小时制)
+restart_minute = 0              # 重启分钟
 
 # 天勤认证信息
-tq_user = "673973541"  # TqAuth 用户名
-tq_password = "Xin940302."  # TqAuth 密码
+tq_user = "673973541"           # TqAuth 用户名
+tq_password = "Xin940302."      # TqAuth 密码
