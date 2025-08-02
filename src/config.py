@@ -64,7 +64,7 @@ symbols_list = [
 
 # ==================== 系统配置 ====================
 # 日志配置
-log_level = "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR
+log_level = "DEBUG"  # 日志级别: DEBUG, INFO, WARNING, ERROR
 log_filename = "strategy.log"  # 日志文件名（当log_to_file=True时使用）
 
 # 天勤认证信息

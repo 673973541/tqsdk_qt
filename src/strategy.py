@@ -34,6 +34,7 @@ class TradingSignals:
 class Strategy:
     def __init__(self, api: TqApi, symbol_base: str, timeperiod: int) -> None:
         self.api: TqApi = api
+        self.is_backtest: bool = api._backtest is not None
         self.symbol: Optional[str] = None
         self.symbol_base: str = symbol_base
         self.timeperiod: int = timeperiod
@@ -112,12 +113,13 @@ class Strategy:
         short_open = wr_sell and adx_signal and ma_sell
         long_exit = wr_sell
         short_exit = wr_buy
-        # logging.debug(
-        #     f"adx: {adx}, ma20: {ma20}, ma144: {ma144}, wr: {wr}"
-        # )
-        # logging.debug(
-        #     f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
-        # )
+        if not self.is_backtest:
+            logging.debug(
+                f"adx: {adx}, ma_short: {ma_short}, ma_long: {ma_long}, wr: {wr}"
+            )
+            logging.debug(
+                f"long_open: {long_open}, short_open: {short_open}, long_exit: {long_exit}, short_exit: {short_exit}"
+            )
         return TradingSignals(
             stop_loss=stop_loss,
             take_profit=take_profit,
