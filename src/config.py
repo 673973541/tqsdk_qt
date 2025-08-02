@@ -68,10 +68,6 @@ log_level = "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR
 log_to_file = False  # 是否将日志输出到文件
 log_filename = "strategy.log"  # 日志文件名（当log_to_file=True时使用）
 
-# 每日重启时间配置
-restart_hour = 8  # 重启小时 (24小时制)
-restart_minute = 0  # 重启分钟
-
 # 天勤认证信息
 tq_user = "673973541"  # TqAuth 用户名
 tq_password = "Xin940302."  # TqAuth 密码
