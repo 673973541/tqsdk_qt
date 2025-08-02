@@ -1,13 +1,21 @@
-from tqsdk import TqApi,TargetPosTask
+from tqsdk import TqApi, TargetPosTask
 import talib
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 import logging
 import pandas as pd
 from config import (
-    fixed_pos, risk_ratio, ma_short_period, ma_long_period,
-    atr_period, adx_period, stop_loss_atr_multiplier,
-    take_profit_ratio, rsi_oversold, rsi_overbought, adx_threshold
+    fixed_pos,
+    risk_ratio,
+    ma_short_period,
+    ma_long_period,
+    atr_period,
+    adx_period,
+    stop_loss_atr_multiplier,
+    take_profit_ratio,
+    rsi_oversold,
+    rsi_overbought,
+    adx_threshold,
 )
 
 
@@ -21,6 +29,7 @@ class TradingSignals:
     short_open: bool
     long_exit: bool
     short_exit: bool
+
 
 class Strategy:
     def __init__(self, api: TqApi, symbol_base: str, timeperiod: int) -> None:
@@ -55,7 +64,7 @@ class Strategy:
                 self.target_pos = TargetPosTask(self.api, self.symbol)
                 logging.info(f"使用期权合约: {self.symbol}")
             return
-        
+
         # 期货合约查询主力合约
         exchange = self.symbol_base.split(".")[0]
         product = self.symbol_base.split(".")[1]
@@ -79,14 +88,14 @@ class Strategy:
         high = self.klines.high.values
         low = self.klines.low.values
         close = self.klines.close.values
-        
+
         # 使用配置文件中的参数计算指标
         ma_short = talib.MA(close, timeperiod=ma_short_period)[-1]
         ma_long = talib.MA(close, timeperiod=ma_long_period)[-1]
         atr = talib.ATR(high, low, close, timeperiod=atr_period)[-1]
         wr = talib.WILLR(high, low, close, timeperiod=ma_short_period)[-1]
         adx = talib.ADX(high, low, close, timeperiod=adx_period)[-1]
-        
+
         # 信号判断
         adx_signal = adx > adx_threshold
         ma_buy = ma_short > ma_long
@@ -130,9 +139,7 @@ class Strategy:
             # 开多信号
             if signals.long_open:
                 self.target_pos.set_target_volume(
-                    fixed_pos
-                    if fixed_pos
-                    else self.position_size()
+                    fixed_pos if fixed_pos else self.position_size()
                 )
                 self.is_buy = True
                 self.entry_price = current_price
@@ -146,12 +153,7 @@ class Strategy:
             # 开空信号
             elif signals.short_open:
                 self.target_pos.set_target_volume(
-                    -1
-                    * (
-                        fixed_pos
-                        if fixed_pos
-                        else self.position_size()
-                    )
+                    -1 * (fixed_pos if fixed_pos else self.position_size())
                 )
                 self.is_sell = True
                 self.entry_price = current_price
@@ -215,6 +217,7 @@ class Strategy:
             "stop_loss_count": self.stop_loss_count,
             "take_profit_count": self.take_profit_count,
         }
+
     # 计算开仓手数
     def position_size(self) -> int:
         # 提取合约基础代码
@@ -222,7 +225,6 @@ class Strategy:
         # 期权合约
         if "-C-" in parts[1] or "-P-" in parts[1]:
             return 1  # 期权合约通常最小开仓1手
-        
 
         # 使用TA-Lib计算ATR，性能更好
         close = self.klines.close.values
