@@ -3,6 +3,7 @@ from tqsdk.exceptions import BacktestFinished
 import logging
 import time
 import signal
+import sys
 from strategy import Strategy
 from config import (
     timeperiod,
@@ -13,26 +14,28 @@ from config import (
     log_level,
     tq_user,
     tq_password,
-    log_to_file,
     log_filename,
 )
 
-# 配置日志记录
-if log_to_file:
-    # 输出到文件
-    logging.basicConfig(
-        filename=log_filename,
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
-    print(f"日志将输出到文件: {log_filename}")
-else:
-    # 输出到控制台
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(levelname)s - %(message)s",
-    )
-    print("日志将输出到控制台")
+
+def logging_setup(log_to_file: bool) -> None:
+    """设置日志记录"""
+    if log_to_file:
+        # 输出到文件
+        logging.basicConfig(
+            filename=log_filename,
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
+        print(f"日志将输出到文件: {log_filename}")
+    else:
+        # 输出到控制台
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
+        print("日志将输出到控制台")
+
 
 # 全局变量用于优雅退出
 graceful_exit = False
@@ -72,7 +75,6 @@ def backtest() -> None:
         strategies: list[Strategy] = []
         for symbol in SYMBOLS:
             strategies.append(Strategy(api, symbol, timeperiod))
-        count: int = 0
         while graceful_exit is False:
             api.wait_update()
             # 遍历每个品种执行策略
@@ -94,9 +96,6 @@ def backtest() -> None:
                     f"止损次数: {stats['stop_loss_count']}, 止盈次数: {stats['take_profit_count']}"
                 )
         logging.info(f"总耗时: {time.time() - start_time:.2f} 秒")
-    except KeyboardInterrupt:
-        logging.info("用户中断程序")
-        graceful_exit = True
     except Exception as e:
         logging.error(f"发生错误: {e}", exc_info=True)
     finally:
@@ -104,4 +103,11 @@ def backtest() -> None:
 
 
 if __name__ == "__main__":
-    backtest()  # 回测功能
+    if len(sys.argv) > 1 and sys.argv[1] == "file":
+        log_to_file = True
+    else:
+        log_to_file = False
+    logging_setup(log_to_file)
+    logging.info("=== 回测程序启动 ===")
+    backtest()  # 启动回测
+    logging.info("=== 回测程序结束 ===")
